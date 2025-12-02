@@ -20,6 +20,8 @@ jobs:
     - name: Install SnowCLI
       run: |
         pip install snowflake-cli-labs
+    - name: Debug Env
+      run: env | grep SNOW
 
     - name: Test Snowflake Connection
       run: |
