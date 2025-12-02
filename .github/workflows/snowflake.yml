@@ -1,4 +1,4 @@
-name: Snowflake CI-CD Pipeline
+name: Snowflake Deployment
 
 on:
   push:
@@ -8,46 +8,35 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SF_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SF_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SF_PASSWORD }}
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
+    - name: Install SnowCLI
+      run: |
+        pip install snowflake-cli-labs
 
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install snowflake-connector-python boto3
-          # Better practice: Create a requirements.txt and run: pip install -r requirements.txt
+    - name: Test Snowflake Connection
+      run: |
+        snow sql -x \
+          --role ACCOUNTADMIN \
+          --warehouse COMPUTE_WH \
+          --database MY_DATABASE \
+          --schema PUBLIC \
+          -q "SELECT CURRENT_USER(), CURRENT_ROLE();"
 
-      - name: Verify Secrets (Safe Debug)
-        env:
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-        run: |
-          if [ -z "$SNOWFLAKE_USER" ]; then
-            echo "❌ SNOWFLAKE_USER is EMPTY. Check Repository Settings > Secrets."
-            exit 1
-          else
-            echo "✅ SNOWFLAKE_USER is set (Length: ${#SNOWFLAKE_USER})"
-          fi
-
-      - name: Run Snowflake Pipeline Script
-        env:
-          # Snowflake Credentials
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-          
-          # AWS Credentials (Required for boto3)
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: "us-east-1" # Change to your region
-        run: |
-          python aws_s3/load_json.py
+    - name: Deploy SQL Files
+      run: |
+        for file in sql/*.sql; do
+          snow sql -x \
+            --role ACCOUNTADMIN \
+            --warehouse COMPUTE_WH \
+            --database MY_DATABASE\
+            --schema PUBLIC \
+            -f "$file"
+        done
