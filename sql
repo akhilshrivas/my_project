@@ -1,4 +1,3 @@
-01_create_db_schema.sql
-02_create_stage.sql
-03_create_table.sql
-04_copy_into.sql
+01_demo.sql
+02_stage.sql
+03_copy_into.sql
